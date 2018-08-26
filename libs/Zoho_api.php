@@ -487,12 +487,9 @@ class Zoho_api
                     ],
                 ],
             ];
-
-            file_put_contents("c:\\OSPanel\\domains\\test\\roistat\\lid_convert_data.txt","\nВыводимые данные:\n\n".print_r(json_encode($data),TRUE), FILE_APPEND | LOCK_EX );
+            
             $result = $this->q(self::BURL_CRM."Leads/".$lid_id."/actions/convert",json_encode($data),"POST",true);
             $result = json_decode($result,TRUE);
-
-            file_put_contents("c:\\OSPanel\\domains\\test\\roistat\\lid_convert.txt","\nВыводимые данные:\n\n".print_r($result,TRUE), FILE_APPEND | LOCK_EX );
 
             if ($result['status'] && $result['status'] == "error") {
                 $this->set_error(25);
