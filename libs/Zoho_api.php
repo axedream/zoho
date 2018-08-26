@@ -10,6 +10,10 @@ namespace app\libs;
 class Zoho_api
 {
 
+    CONST BURL_ACCOURN = "https://accounts.zoho.eu/";
+
+    CONST BURL_CRM = "https://crm.zoho.eu/crm/v2/";
+
     /**
      * Соединение
      *
@@ -91,7 +95,8 @@ class Zoho_api
             '1' =>  'Не верный/указан client_id/client_secret',
             '2' =>  'Нет данных в модели',
             '10'=>  'Исключительная ошибка',
-            '21'=>  'Неверный ключ достпа. Проверьте файл конфигурации api_zoho.php !'
+            '21'=>  'Неверный ключ достпа. Проверьте файл конфигурации api_zoho.php !',
+            '22'=>  'Ошибка в запросе поиска лида по номеру телефона!',
         ];
     }
 
@@ -106,8 +111,8 @@ class Zoho_api
             'name' => 'Имя',
             'phone'=> 'Телефон',
             'email'=> 'E-mail',
-            'comment'=> 'Коментарий',
-            'price' => 'Стоимость',
+            'city'=> 'Город',
+            'company' => 'Компания',
         ];
     }
 
@@ -118,7 +123,7 @@ class Zoho_api
      */
     public static function wron_attr()
     {
-        return ['name','price','phone'];
+        return ['phone','name'];
     }
 
 
@@ -134,7 +139,7 @@ class Zoho_api
         $this->init_error();
         if (!$this->error) $this->init_config($config);
         if (!$this->error) $this->init_data($model);
-        if (!$this->error) $this->reqGet_token();
+        if (!$this->error) $this->test_key_only();
     }
 
     /**
@@ -287,7 +292,81 @@ class Zoho_api
 
         //для модели
         if (in_array($name,array_keys(self::attr()))) {
-            return $this->model['name'];
+            return $this->model[$name];
+        }
+    }
+
+
+    /**
+     * Делаем запрос
+     *
+     * @retunr bool
+     */
+    private function q($url,$data=[],$type = 'POST',$header_post=FALSE)
+    {
+
+        $this->ch = curl_init();
+        curl_setopt($this->ch, CURLOPT_URL, $url);
+
+        curl_setopt($this->ch, CURLOPT_RETURNTRANSFER,TRUE);
+
+        if ($type == 'PUT') {
+            if ($header_post) {
+                curl_setopt($this->ch, CURLOPT_HTTPHEADER, ['Authorization: '.$this->access_key,"Content-Type: application/json" ]);
+            }
+            curl_setopt($this->ch, CURLOPT_CUSTOMREQUEST, "PUT");
+            curl_setopt($this->ch, CURLOPT_POSTFIELDS,http_build_query($data));
+
+        }
+
+        if ($type == 'POST') {
+            if ($header_post) {
+                curl_setopt($this->ch, CURLOPT_CUSTOMREQUEST,"POST");
+                curl_setopt($this->ch, CURLOPT_HTTPHEADER, ['Authorization: '.$this->access_key,"Content-Type: application/json","Cache-Control: no-cache"]);
+            }
+            curl_setopt($this->ch, CURLOPT_POST, TRUE);
+            curl_setopt($this->ch, CURLOPT_POSTFIELDS, $data);
+        }
+        if ($type == 'GET') {
+            curl_setopt($this->ch, CURLOPT_HTTPHEADER, ['Authorization: '.$this->access_key,"Cache-Control: no-cache" ]);
+        }
+
+        $result = curl_exec($this->ch);
+
+        //file_put_contents("c:\\OSPanel\\domains\\test\\roistat\\curl.txt",print_r($url,TRUE), FILE_APPEND | LOCK_EX );
+        //file_put_contents("c:\\OSPanel\\domains\\test\\roistat\\curl.txt","\n".print_r($result,TRUE)."\n\n", FILE_APPEND | LOCK_EX );
+
+        curl_close($this->ch);
+
+        return $result;
+    }
+
+
+    /**
+     * Попытка постучаться по старому ключу
+     */
+    private function test_key_only()
+    {
+        if (file_exists(__DIR__."/templ_key.php")) {
+            $this->access_key = file_get_contents(__DIR__."/templ_key.php", FILE_USE_INCLUDE_PATH);
+            $this->test_key();
+        } else {
+            $this->reqGet_token();
+        }
+
+    }
+
+    /**
+     * Тест ключа, для организации и хранения ключа
+     */
+    private function test_key()
+    {
+        $result = $this->q(self::BURL_CRM."org",[],"GET");
+        $result = json_decode($result, TRUE);
+
+        //если не получаем данные, значит ключ проэкспарился, нужно получить новый
+        if ($result['status'] && $result['status']=='error') {
+            $this->reqGet_token();
         }
     }
 
@@ -299,9 +378,6 @@ class Zoho_api
      */
     private function reqGet_token()
     {
-        $url = "https://accounts.zoho.eu/apiauthtoken/nb/create";
-        $this->ch = curl_init();
-
         $postData = [
             'SCOPE' => "ZohoCRM/crmapi",
             'DISPLAY_NAME'=>'Zoho_lib',
@@ -309,18 +385,14 @@ class Zoho_api
             'PASSWORD' => $this->config['client_password'],
         ];
 
-        curl_setopt($this->ch, CURLOPT_URL, $url);
-        curl_setopt($this->ch, CURLOPT_RETURNTRANSFER,1);
-        curl_setopt($this->ch, CURLOPT_POST, 1);
-        curl_setopt($this->ch, CURLOPT_POSTFIELDS, $postData);
+        $result = $this->q(self::BURL_ACCOURN."apiauthtoken/nb/create",$postData,"POST");
 
-        $result = curl_exec($this->ch);
-        curl_close($this->ch);
         $arr = explode("\n",$result);
         $result = explode("=",$arr[2]);
         if (explode("=",$arr[3])[1] == 'TRUE') {
             $this->set_error(0);
             $this->access_key =  $result[1];
+            file_put_contents(__DIR__."/templ_key.php",$this->access_key);
         }
         $this->set_error(21);
     }
@@ -329,23 +401,58 @@ class Zoho_api
     /**
      * Поиск лида по номеру телеофна
      */
-    private function find_lid_phone()
+    public function find_lid_phone($phone=FALSE)
     {
+
+        $phone = ($phone) ? $phone : $this->phone;
+
+        $search = '';
+        if ($phone)
+        {
+            $search= "?&fields=Phone";
+        }
+
+        $result = $this->q(self::BURL_CRM."leads".$search,[],"GET");
+        $result = json_decode($result,TRUE);
+        if (is_array($result) && isset($result['data'])) {
+            $this->set_error(0);
+            foreach ( $result['data'] as $lid ) {
+                if ($lid['Phone'] == $phone) {
+                    return $lid['id'];
+                }
+            }
+        } else {
+            $this->set_error(22);
+        }
+        return FALSE;
 
     }
 
     /**
      * Создать лид
      */
-    private function create_lid()
+    public function create_lid()
     {
+        $data = json_encode([
+            'data' => [
+                [
+                'Last_Name' => $this->name,
+                'Phone' => $this->phone,
+                'Email' => $this->email,
+                'City'=>$this->city,
+                'Company'=>$this->company,
+                ]
+            ],
+        ]);
 
+        //$data = str_replace('"', '\"', $data);
+        $result = $this->q(self::BURL_CRM."leads",$data,"POST",TRUE);
     }
 
     /**
-     * Обновить лид
+     * Создать сделку
      */
-    private function update_lid()
+    private function create_deal()
     {
 
     }

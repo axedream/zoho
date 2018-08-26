@@ -25,11 +25,11 @@ $script = <<<JS
         }
         
         // ---------------------- afrer request -----------------------//
-        function good_request() {
+        function good_request(msg) {
             $("#show_result").modal('show');
             remove_all_class();
             $("#show_result div.modal-header").addClass('bg-success');
-            $("#test_result").text('Успех. Лид создан!');
+            $("#test_result").text(msg);
         }
 
         function bad_request(text) {
@@ -72,7 +72,7 @@ $script = <<<JS
                 cache: false,
                 success: function (msg) {
                     if (msg.error=="no") {
-                        good_request();
+                        good_request(msg.msg);
                     } else {
                         bad_request(msg.msg);
                     }
@@ -127,19 +127,22 @@ $form = ActiveForm::begin([
                 <?= $form->field($model, 'email') ?>
             </div>
         </div>
-
         <div class="col-md-3">
-            <div class="t">
-                <?= $form->field($model, 'price') ?>
-            </div>
         </div>
     </div>
 
     <div class="col-md-12">
-        <div class="col-md-12">
+        <div class="col-md-4">
             <div class="t">
-                <?= $form->field($model, 'comment') ?>
+                <?= $form->field($model, 'city') ?>
             </div>
+        </div>
+        <div class="col-md-4">
+            <div class="t">
+                <?= $form->field($model, 'company') ?>
+            </div>
+        </div>
+        <div class="col-md-4">
         </div>
     </div>
 

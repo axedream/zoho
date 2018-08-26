@@ -8,16 +8,15 @@ class Lid extends Model
     public $name;
     public $phone;
     public $email;
-    public $price;
-    public $comment;
+    public $city;
+    public $company;
 
 
     public function rules()
     {
         return [
-            [['name','phone','email','comment'], 'string', 'max' => 255],
-            [['name','price','phone'],'required'],
-            [['price'], 'safe'],
+            [['name','phone','email','company','city'], 'string', 'max' => 255],
+            [['phone','name'],'required'],
             // тут определяются правила валидации
         ];
     }
@@ -28,8 +27,8 @@ class Lid extends Model
             'name' => 'Имя клиента',
             'phone'=> 'Телефон клиента',
             'email'=> 'Электронный адрес клиента',
-            'price'=> 'Стоимость сделки',
-            'comment'=>'Дополнительный коментарий',
+            'city'=> 'Город',
+            'company'=>'Компания',
         ];
     }
 }

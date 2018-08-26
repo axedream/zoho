@@ -41,6 +41,18 @@ class SiteController extends BasicController
         //$model = ['name'=>'1 ','price'=>'12']; //тест заглушка
         $model_zoho = new Zoho_api(Yii::$app->params['api_zoho'],$model);
 
+        //ищем в лида номер телефона
+        //toDo по хорошему нужно сделать меод который будет приводить номера телефонов к кединому виду +7 (в зависимости от страны)
+        $result = $model_zoho->find_lid_phone();
+
+        //если найдено, тогда создаем сделку, в противном случае добавляем лид (предварительный контакт
+        if (!$model_zoho->error && $result) {
+            $this->msg = 'Создана сделка!';
+        } else {
+            $model_zoho->create_lid();
+            $this->msg = 'Создан новый предварительный контакт (лид)!';
+        }
+
         if ($model_zoho->error) {
             $this->error_conver($model_zoho);
         }
