@@ -47,7 +47,8 @@ class SiteController extends BasicController
 
         //если найдено, тогда создаем сделку, в противном случае добавляем лид (предварительный контакт
         if (!$model_zoho->error && $result) {
-            $this->msg = 'Создана сделка!';
+            $model_zoho->convert_deal_to_lid();
+            $this->msg = 'Создана сделка!: '.$model_zoho->get_result();
         } else {
             $model_zoho->create_lid();
             $this->msg = 'Создан новый предварительный контакт (лид)!';

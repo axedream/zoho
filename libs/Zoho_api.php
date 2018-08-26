@@ -97,6 +97,9 @@ class Zoho_api
             '10'=>  'Исключительная ошибка',
             '21'=>  'Неверный ключ достпа. Проверьте файл конфигурации api_zoho.php !',
             '22'=>  'Ошибка в запросе поиска лида по номеру телефона!',
+            '23'=>  'Не корректно введен id лида',
+            '24'=>  'Не корретно обработан запрос на создание лида',
+            '25'=>  'Не корретно обработан запрос на конвертацию лида',
         ];
     }
 
@@ -418,6 +421,7 @@ class Zoho_api
             $this->set_error(0);
             foreach ( $result['data'] as $lid ) {
                 if ($lid['Phone'] == $phone) {
+                    $this->result = $lid['id'];
                     return $lid['id'];
                 }
             }
@@ -441,20 +445,66 @@ class Zoho_api
                 'Email' => $this->email,
                 'City'=>$this->city,
                 'Company'=>$this->company,
-                ]
+                ],
             ],
         ]);
 
-        //$data = str_replace('"', '\"', $data);
         $result = $this->q(self::BURL_CRM."leads",$data,"POST",TRUE);
+
+        $_re = json_decode($result,TRUE);
+
+        if ($_re['data'] && $_re['data'][0] && $_re['data'][0]['code'] && $_re['data'][0]['code'] == 'SUCCESS' ) {
+
+            $this->set_error(0);
+            return TRUE;
+        } else {
+            $this->set_error(24);
+        }
+
     }
 
     /**
-     * Создать сделку
+     * Конвертировать лид в сделку
      */
-    private function create_deal()
+    public function convert_deal_to_lid($lid_id = FALSE)
     {
+        $lid_id = ($lid_id) ? $lid_id : $this->find_lid_phone();
+        if (is_numeric($lid_id)) {
 
+            $data = [
+                'data' => [
+                    [
+                    "overwrite" => true,
+                    "notify_lead_owner" => false,
+                    "notify_new_entity_owner" => false,
+                    "Accounts" => "144263000000116152", //ID контрагента toDo вывести в dropDown list
+                    "Contacts" => $lid_id, //ID контакта из справочника
+                    "Deals" => [
+                        "Deal_Name" => "test",
+                        "Stage" => "Stage_0",
+                        "Amount"=> 56.6,
+                        ],
+                    ],
+                ],
+            ];
+
+            file_put_contents("c:\\OSPanel\\domains\\test\\roistat\\lid_convert_data.txt","\nВыводимые данные:\n\n".print_r(json_encode($data),TRUE), FILE_APPEND | LOCK_EX );
+            $result = $this->q(self::BURL_CRM."Leads/".$lid_id."/actions/convert",json_encode($data),"POST",true);
+            $result = json_decode($result,TRUE);
+
+            file_put_contents("c:\\OSPanel\\domains\\test\\roistat\\lid_convert.txt","\nВыводимые данные:\n\n".print_r($result,TRUE), FILE_APPEND | LOCK_EX );
+
+            if ($result['status'] && $result['status'] == "error") {
+                $this->set_error(25);
+                return FALSE;
+            } else {
+                $this->set_error( 0);
+                return TRUE;
+            }
+
+        }
+        $this->set_error(23);
+        return FALSE;
     }
 
     /**
